@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://github.com/arturgrochau/macos-vim-navigation/config.schema.json",
   "title": "KeyDeck configuration",
-  "description": "User config consumed by the Hammerspoon engine and written by the SwiftUI preset editor. Deep-merged over the engine defaults, so any subset of keys is valid.",
+  "description": "KeyDeck configuration, stored at ~/Library/Application Support/KeyDeck/config.json and written by the app. Merged over the built-in defaults, so any subset of keys is valid. Fields marked legacy are read for backward compatibility but ignored by the 2.0 engine.",
   "type": "object",
   "additionalProperties": false,
   "definitions": {
@@ -13,14 +13,14 @@
       "required": ["key"],
       "properties": {
         "mods": { "type": "array", "items": { "$ref": "#/definitions/modifier" } },
-        "key": { "type": "string", "description": "Hammerspoon key name, e.g. 'h', 'space', 'f12', '='." }
+        "key": { "type": "string", "description": "Key name, e.g. 'h', 'space', 'f12', '='." }
       }
     }
   },
   "properties": {
     "preset": { "type": "string", "description": "Name of the active preset (informational)." },
-    "debug": { "type": "boolean", "description": "Emit extra hs.alert diagnostics." },
-    "customLua": { "type": "string", "description": "Raw Lua run after modules load (Developer Settings)." },
+    "debug": { "type": "boolean", "description": "Legacy (1.x): extra Hammerspoon diagnostics." },
+    "customLua": { "type": "string", "description": "Legacy (1.x): raw Lua run after the Spoon's modules load. The native engine ignores it." },
     "tuning": {
       "type": "object",
       "additionalProperties": false,
@@ -49,7 +49,7 @@
             "activator": {
               "type": "object",
               "additionalProperties": false,
-              "description": "Primary way to toggle NAV MODE.",
+              "description": "How Nav Mode is entered: a hotkey, or a clean tap of a modifier (which costs no shortcut).",
               "properties": {
                 "kind": { "enum": ["tapModifier", "doubleTapModifier", "hotkey", "hyper", "capsLock"] },
                 "modifier": { "enum": ["alt", "cmd", "ctrl", "shift", "rightAlt", "leftAlt", "rightCmd", "leftCmd", "rightCtrl", "leftCtrl"] },
@@ -72,7 +72,7 @@
             "optionTapCycle": { "type": "boolean", "description": "Tap cycleModifier alone (on release, idle-guarded) to move to the next display." },
             "cycleModifier": { "enum": ["alt", "ctrl", "cmd"], "description": "Modifier whose clean tap-and-release cycles displays. Default alt (Option)." },
             "optionScroll": { "type": "boolean" },
-            "jumpKeys": { "type": "array", "items": { "type": "string" } },
+            "jumpKeys": { "type": "array", "items": { "type": "string" }, "description": "Legacy (1.x). In 2.0, 1-9 inside Nav Mode jump to display N." },
             "jumpClickKeys": { "type": "array", "items": { "type": "string" } },
             "parkKeys": { "type": "array", "items": { "type": "string" } },
             "parkPadding": { "type": "number", "minimum": 0 },

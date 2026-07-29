@@ -1,6 +1,15 @@
-# KeyDeck.spoon
+# KeyDeck.spoon — legacy (1.x)
 
-The KeyDeck engine, packaged as a standard [Hammerspoon Spoon](https://www.hammerspoon.org/Spoons/).
+> **This is not the product any more.** KeyDeck 2.0 is a self-contained macOS app
+> with its own native engine: no Hammerspoon, no Lua, no install step beyond
+> granting Accessibility. See the [main README](../../README.md).
+>
+> This Spoon is kept for people who already run Hammerspoon and would rather
+> drive KeyDeck from their existing config. It reads
+> `~/.hammerspoon/keydeck-config.json`, which the 2.0 app no longer writes — so
+> if you run both, configure this one by hand.
+
+The 1.x KeyDeck engine, packaged as a standard [Hammerspoon Spoon](https://www.hammerspoon.org/Spoons/).
 It coexists with any existing Hammerspoon configuration.
 
 ## Usage

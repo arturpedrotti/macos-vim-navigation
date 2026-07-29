@@ -4,7 +4,7 @@ import Foundation
 /// always usable; a Gumroad license unlocks Pro (unlimited launchers). The
 /// app layer fills `machineID`, performs Gumroad verification, stamps
 /// `firstLaunchAt` for the trial, and reads/writes this to disk.
-public struct LicenseState: Codable, Equatable {
+public struct LicenseState: Codable, Equatable, Sendable {
     public var licenseKey: String?
     public var email: String?
     public var machineID: String?

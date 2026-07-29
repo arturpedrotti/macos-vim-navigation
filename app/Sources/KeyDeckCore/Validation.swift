@@ -1,8 +1,9 @@
 import Foundation
 
-/// Detects duplicate key bindings. Hammerspoon has two independent binding
-/// namespaces — global hotkeys (active anywhere) and modal keys (active only in
-/// NAV MODE) — so a collision only matters within the same namespace.
+/// Detects duplicate key bindings. There are two independent namespaces —
+/// global shortcuts (active anywhere) and Nav Mode keys (active only inside the
+/// mode) — so a collision only matters within the same namespace. A key can be
+/// a global trigger and a Nav Mode launcher at once without clashing.
 public struct BindingConflict: Equatable {
     public let scope: String        // "Global" or "NAV MODE"
     public let signature: String    // human-readable, e.g. "⌥1"
@@ -13,19 +14,23 @@ public enum Validation {
     static let symbols: [String: String] = ["cmd": "⌘", "alt": "⌥", "ctrl": "⌃", "shift": "⇧"]
     static let order = ["ctrl", "alt", "shift", "cmd"]
 
-    /// Keys the engine reserves inside NAV MODE (modules/nav.lua). A launcher
-    /// assigned to one of these would silently shadow a navigation binding.
+    /// Keys the engine itself owns inside Nav Mode (see `NavMode.action`). A
+    /// launcher assigned to one of these would never fire — built-ins are
+    /// resolved first — so the app refuses to save it.
     public static let reservedNavKeys: Set<String> = [
-        "h", "j", "k", "l",            // pointer movement
-        "d", "u", "w", "b",            // scrolling
-        "g",                           // gg / G scroll-to-edge
-        "i", "a",                      // clicks
-        "up", "down", "left", "right", // arrow equivalents
+        "h", "j", "k", "l",             // pointer movement
+        "d", "u", "w", "b",             // scrolling
+        "g",                            // gg / G scroll-to-edge
+        "i", "a", "space",              // clicks
+        "up", "down", "left", "right",  // arrow equivalents
+        "[", "]",                       // previous / next display
+        "1", "2", "3", "4", "5", "6", "7", "8", "9",  // jump to display N
     ]
-    /// Shift-modified keys reserved by NAV MODE (big moves/scrolls, focus
-    /// cycling, center-mouse, the ? help overlay).
+    /// Shift-modified keys reserved by Nav Mode (big moves and scrolls, app
+    /// cycling, center-pointer, double-click, and the ? cheat sheet).
     public static let reservedShiftNavKeys: Set<String> = [
-        "h", "j", "k", "l", "d", "u", "w", "b", "g", "a", "i", "m", "/",
+        "h", "j", "k", "l", "d", "u", "w", "b", "g", "a", "i", "m", "/", "space",
+        "up", "down", "left", "right",
     ]
 
     /// True when key+mods collides with a binding the engine itself owns in NAV MODE.
@@ -70,15 +75,9 @@ public enum Validation {
             else if a.kind == "capsLock" { addGlobal([], "f18") }
             // tapModifier / doubleTapModifier are modifier taps — no normal-key conflict.
         }
-        if f.monitors.enabled {
-            for k in f.monitors.jumpKeys { addGlobal(["alt"], k) }
-            for k in f.monitors.jumpClickKeys { addGlobal(["alt"], k) }
-            for k in f.monitors.parkKeys { addGlobal(["alt"], k) }
-            addGlobal(f.monitors.focusLeft.mods, f.monitors.focusLeft.key)
-            addGlobal(f.monitors.focusRight.mods, f.monitors.focusRight.key)
-            addGlobal(f.monitors.nextDisplay.mods, f.monitors.nextDisplay.key)
-            addGlobal(f.monitors.prevDisplay.mods, f.monitors.prevDisplay.key)
-        }
+        // Display features are all reached from inside Nav Mode or by a bare
+        // modifier tap, so they claim no global shortcut of their own — that is
+        // the whole point of the modal layer.
 
         // Modal (NAV MODE) keys: the engine's reserved keys, exit keys, launchers.
         if f.nav.enabled {

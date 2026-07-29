@@ -1,7 +1,7 @@
 import Foundation
 
 /// What the user is entitled to right now.
-public enum Tier: Equatable {
+public enum Tier: Equatable, Sendable {
     case pro
     case trial(daysLeft: Int)
     case free

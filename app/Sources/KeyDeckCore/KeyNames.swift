@@ -1,11 +1,12 @@
 import Foundation
 
-/// Pure mapping between AppKit key events and the key names the Hammerspoon engine
-/// understands (`hs.keycodes.map`). Kept free of AppKit so it is unit-testable; the
-/// shortcut recorder (in the app target) feeds it raw keyCode / modifierFlags values.
+/// Pure mapping between AppKit key events and the key names used in the config
+/// file. Kept free of AppKit so it is unit-testable; the shortcut recorder feeds
+/// it raw keyCode / modifierFlags values, and `KeyDeckEngine.KeyCodes` inverts
+/// the table to match live events.
 public enum KeyNames {
-    /// US ANSI virtual keycode → Hammerspoon key name. Deterministic regardless of the
-    /// active keyboard layout's produced characters.
+    /// US ANSI virtual keycode → key name. Deterministic regardless of the active
+    /// keyboard layout's produced characters.
     public static let byKeyCode: [Int: String] = [
         0: "a", 1: "s", 2: "d", 3: "f", 4: "h", 5: "g", 6: "z", 7: "x", 8: "c", 9: "v",
         11: "b", 12: "q", 13: "w", 14: "e", 15: "r", 16: "y", 17: "t",
@@ -34,7 +35,7 @@ public enum KeyNames {
     private static let optionMask: UInt  = 1 << 19
     private static let commandMask: UInt = 1 << 20
 
-    /// Map raw NSEvent modifier flags to Hammerspoon modifier names (ctrl, alt, shift, cmd).
+    /// Map raw NSEvent modifier flags to config modifier names (ctrl, alt, shift, cmd).
     public static func modifierNames(rawFlags: UInt) -> [String] {
         var mods: [String] = []
         if rawFlags & controlMask != 0 { mods.append("ctrl") }

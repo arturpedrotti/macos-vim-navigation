@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Install the KeyDeck Spoon into ~/.hammerspoon/Spoons and wire it into your
-# init.lua. Safe and idempotent: your own config is never overwritten — the
-# loader is appended once (marker-guarded) and init.lua is backed up first.
+# LEGACY (KeyDeck 1.x). Installs the Hammerspoon Spoon into ~/.hammerspoon/Spoons
+# and wires it into your init.lua. Safe and idempotent: your own config is never
+# overwritten — the loader is appended once (marker-guarded) and init.lua is
+# backed up first.
 #
-# This mirrors exactly what the KeyDeck app's "Set up" button does, so CLI and
-# GUI installs converge on identical state.
+# KeyDeck 2.0 does not need any of this: the engine is compiled into KeyDeck.app.
+# Build it with `cd app && ./bundle.sh` and open it. This script remains only for
+# people who prefer to run the engine inside their existing Hammerspoon setup.
 #
 # Usage:
 #   scripts/install.sh [--config]    # --config also installs the example config

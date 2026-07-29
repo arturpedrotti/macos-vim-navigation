@@ -1,87 +1,98 @@
 # KeyDeck
 
-**Vim-inspired keyboard navigation for macOS, powered by [Hammerspoon](https://www.hammerspoon.org).**
+**A vim-inspired navigation layer for macOS. One app, one permission, no dependencies.**
 
-KeyDeck does three things, and does them fast:
+You have run out of keyboard shortcuts. Every sensible ⌘ and ⌥ combination is
+taken by an app you actually use, and the ones left are three-finger
+contortions you will never remember.
 
-1. **Nav Mode** — press your shortcut (default `⌃=`) and your keyboard takes over the pointer:
-   `h j k l` move, `d u` scroll, `gg / G` jump to top/bottom, `i` clicks, `a` right-clicks.
-   Press `?` inside for the full list, `Esc` to leave.
-2. **Switch displays on release** — tap `⌥` (Option) alone and the pointer jumps to your next
-   monitor. Release-triggered and idle-guarded, so `⌥`-shortcuts are never affected.
-   The modifier is configurable (`⌥` / `⌃` / `⌘`).
-3. **App launchers** — give your apps keys. In Nav Mode, press the key: Nav Mode exits
-   instantly and the app launches or comes to focus.
+KeyDeck gives the whole keyboard back. Press one trigger and you are in **Nav
+Mode**, where every bare key is yours again:
 
-Everything runs inside Hammerspoon as a standard [Spoon](https://www.hammerspoon.org/Spoons/)
-— it coexists with any existing Hammerspoon setup.
+| | |
+|---|---|
+| `h j k l` | move the pointer (`⇧` for big jumps) |
+| `d` `u` `w` `b` | scroll — down, up, left, right (`⇧` for a full page) |
+| `gg` / `G` | top / bottom |
+| `space` / `⇧space` / `i` / `a` | click / double-click / select line / right-click |
+| `1 2 3` and `[` `]` | jump the pointer between displays |
+| `⇧A` / `⇧I` | next / previous app |
+| **your own letters** | launch or focus an app — `s` for Slack, `o` for your browser… |
+| `?` | the full list, generated from your config |
+| `esc` | leave |
+
+Because Nav Mode is *modal*, none of this costs you a system shortcut. And the
+trigger itself needn't cost one either — set it to a clean tap of right ⌥, and
+⌥ keeps working normally in every combination you already use.
 
 ## Install
 
-**Requirement:** [Hammerspoon](https://www.hammerspoon.org) (free), with Accessibility permission granted.
+Download `KeyDeck.app`, drag it to Applications, open it, click **Turn on
+KeyDeck**, tick it in the Accessibility list. That is the whole setup.
 
-### Option A — the KeyDeck app (recommended)
+Accessibility is the *only* permission KeyDeck asks for — macOS requires it of
+anything that reads the keyboard. There is no helper daemon, no scripting
+runtime, and nothing to install alongside it.
 
-A small native app to set your shortcut, toggle display switching, and assign app keys —
-changes apply and verify automatically.
-
-```bash
-cd app && ./bundle.sh    # builds app/KeyDeck.app
-open KeyDeck.app         # click "Set up" inside
-```
-
-### Option B — script
+To build from source:
 
 ```bash
-scripts/install.sh           # installs the Spoon + a 2-line loader (init.lua backed up)
-scripts/install.sh --config  # …and an example keydeck-config.json
+cd app && ./bundle.sh    # → app/KeyDeck.app
+open KeyDeck.app
 ```
 
-### Option C — manual (plain Spoon)
+Requires macOS 13+ and the macOS SDK (Command Line Tools or Xcode). No external
+packages.
 
-Copy `Spoons/KeyDeck.spoon` into `~/.hammerspoon/Spoons/`, then add to your `init.lua`:
+## How it works
 
-```lua
-hs.loadSpoon("KeyDeck")
-spoon.KeyDeck:start()
-```
-
-Optionally bind the Nav Mode toggle the Spoon-conventional way:
-
-```lua
-spoon.KeyDeck:bindHotkeys({ toggle = { { "ctrl" }, "=" } })
-```
-
-## Configuration
-
-The app writes `~/.hammerspoon/keydeck-config.json`; the engine reloads automatically when
-it changes. You can also edit it by hand — any subset of keys is valid (everything else
-falls back to defaults). See [`config/keydeck-config.example.json`](config/keydeck-config.example.json)
-and the full contract in [`config/config.schema.json`](config/config.schema.json).
-
-## Repo layout
+KeyDeck is one Swift process. A `CGEventTap` watches the keyboard: while Nav
+Mode is off it passes every event through untouched except your trigger; while
+Nav Mode is on it consumes keys and turns them into pointer, scroll, click,
+display and launcher actions. Settings mutate the running engine directly —
+there is no apply step, no reload, and no way to be "saved but not running".
 
 | Path | What it is |
 |---|---|
-| `Spoons/KeyDeck.spoon/` | The engine — a standard Hammerspoon Spoon (canonical source) |
-| `app/` | The SwiftUI configuration app ([details](app/README.md)) |
+| `app/Sources/KeyDeckEngine/` | The engine — event tap, Nav Mode, pointer/display/launcher actions, HUD |
+| `app/Sources/KeyDeckCore/` | Config model, storage, validation, entitlements (pure, testable) |
+| `app/Sources/KeyDeck/` | The SwiftUI menu-bar app ([details](app/README.md)) |
 | `config/` | Config schema + example config |
-| `scripts/install.sh` | CLI installer (mirrors the app's "Set up") |
-| `test/run.sh` | Offline test suite (no Hammerspoon needed) |
+| `Spoons/KeyDeck.spoon/` | **Legacy.** The 1.x [Hammerspoon](https://www.hammerspoon.org) engine, kept for people already running Hammerspoon |
+| `app/test/run.sh` | Offline test suite |
+
+## Configuration
+
+Settings live at `~/Library/Application Support/KeyDeck/config.json` and are
+managed by the app. A 1.x config at `~/.hammerspoon/keydeck-config.json` is
+migrated automatically on first launch. Hand-editing works too — any subset of
+keys is valid and the rest falls back to defaults. See
+[`config/keydeck-config.example.json`](config/keydeck-config.example.json) and
+[`config/config.schema.json`](config/config.schema.json).
+
+## Upgrading from 1.x
+
+Your launchers and trigger carry over automatically. The Hammerspoon Spoon is no
+longer used by the app; to stop it running as well, remove the two KeyDeck lines
+from `~/.hammerspoon/init.lua`.
 
 ## Pricing
 
-Free 14-day trial with everything unlocked; afterwards KeyDeck stays free with up to
-3 app launchers. A Pro license (one-time, via Gumroad) removes the limit.
+Free 14-day trial with everything unlocked; afterwards KeyDeck stays free with
+up to 3 app launchers. A Pro license (one-time, via Gumroad) removes the limit.
+Nav Mode itself never stops working.
 
 ## Release checklist
 
 - [ ] Set the real Gumroad product ID in `app/Sources/KeyDeck/License.swift`
       (`LicenseConfig.productID`) and verify `buyURL` — activation fails with
       "not configured" until then.
-- [ ] `test/run.sh` and `app/test/run.sh` green.
-- [ ] `app/bundle.sh` and a manual smoke test (set shortcut → auto-apply →
-      `✓ Saved · ✓ Reloaded` → Nav Mode works).
+- [ ] `app/test/run.sh` green.
+- [ ] Sign `KeyDeck.app` with a Developer ID certificate and notarize it.
+      Accessibility permission is remembered per code identity, so an ad-hoc
+      signature means macOS re-asks after every rebuild.
+- [ ] Manual smoke test: fresh user → open app → grant permission → trigger
+      enters Nav Mode → `?` lists your launchers → a launcher key opens its app.
 
 ## License
 

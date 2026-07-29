@@ -1,5 +1,6 @@
 import XCTest
 @testable import KeyDeckCore
+import KeyDeckEngine
 
 /// Tests for the single-window redesign: nav activator, the curated save,
 /// display-cycle modifier, trial entitlements, and KeyNames. (The XCTest-free
@@ -96,12 +97,6 @@ final class RedesignTests: XCTestCase {
         XCTAssertTrue(s.isPro)
     }
 
-    func testEngineStatusDecode() throws {
-        let json = #"{ "loadedAt": 1700000000, "preset": "default", "navEnabled": true }"#
-        let s = try JSONDecoder().decode(EngineStatus.self, from: Data(json.utf8))
-        XCTAssertEqual(s.loadedAt, 1_700_000_000)
-        XCTAssertTrue(s.navEnabled)
-    }
 
     func testPersistenceRoundTrip() throws {
         var c = Config.default

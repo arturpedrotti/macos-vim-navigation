@@ -17,7 +17,7 @@ extension KeyedDecodingContainer {
 
 /// A key + modifier combination. Named `KeyBinding` (not `Binding`) to avoid
 /// colliding with SwiftUI.Binding.
-public struct KeyBinding: Codable, Hashable {
+public struct KeyBinding: Codable, Hashable, Sendable {
     public var mods: [String]
     public var key: String
 
@@ -36,7 +36,7 @@ extension KeyBinding {
     }
 }
 
-public struct Tuning: Codable, Equatable {
+public struct Tuning: Codable, Equatable, Sendable {
     public var scrollStep: Double
     public var scrollInitialDelay: Double
     public var scrollRepeatInterval: Double
@@ -72,7 +72,7 @@ extension Tuning {
 /// How NAV MODE is toggled. The UI only writes kind "hotkey"; the other kinds
 /// remain decodable so hand-edited and pre-existing configs keep working.
 /// kind: "tapModifier" | "doubleTapModifier" | "hotkey" | "hyper" | "capsLock"
-public struct NavActivator: Codable, Equatable {
+public struct NavActivator: Codable, Equatable, Sendable {
     public var kind: String
     public var modifier: String
     public var onRelease: Bool
@@ -97,7 +97,7 @@ extension NavActivator {
     }
 }
 
-public struct NavFeature: Codable, Equatable {
+public struct NavFeature: Codable, Equatable, Sendable {
     public var enabled: Bool
     public var activator: NavActivator
     public var exitKeys: [KeyBinding]
@@ -118,7 +118,7 @@ extension NavFeature {
     }
 }
 
-public struct MonitorsFeature: Codable, Equatable {
+public struct MonitorsFeature: Codable, Equatable, Sendable {
     public var enabled: Bool
     public var skipVirtualDisplayPattern: String
     public var optionTapCycle: Bool
@@ -168,7 +168,7 @@ extension MonitorsFeature {
     }
 }
 
-public struct Features: Codable, Equatable {
+public struct Features: Codable, Equatable, Sendable {
     public var nav: NavFeature
     public var monitors: MonitorsFeature
     public static let `default` = Features(nav: .default, monitors: .default)
@@ -183,7 +183,7 @@ extension Features {
     }
 }
 
-public struct AppShortcut: Codable, Identifiable, Hashable {
+public struct AppShortcut: Codable, Identifiable, Hashable, Sendable {
     public var id: UUID
     public var key: String
     public var mods: [String]
@@ -234,7 +234,7 @@ extension AppShortcut {
     }
 }
 
-public struct Config: Codable, Equatable {
+public struct Config: Codable, Equatable, Sendable {
     public var preset: String
     public var debug: Bool
     public var customLua: String

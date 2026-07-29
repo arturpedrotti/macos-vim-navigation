@@ -66,10 +66,13 @@ do {
     check("isReservedNavKey: bare z is free", !Validation.isReservedNavKey(key: "z", mods: []))
 }
 do {
+    // The Nav Mode trigger is the only global shortcut KeyDeck claims — putting
+    // a launcher on it is not a conflict, because launchers live in the modal
+    // namespace and only fire once the mode is already on.
     var c = Config.default
-    c.features.monitors.jumpKeys = ["1", "1"]
-    check("duplicate global binding detected (⌥1)",
-          Validation.conflicts(in: c).contains { $0.scope == "Global" && $0.signature == "⌥1" })
+    c.apps = [AppShortcut(key: "=", mods: ["ctrl"], bundleID: "a")]
+    check("trigger and a same-key launcher are different namespaces",
+          !Validation.conflicts(in: c).contains { $0.scope == "Global" })
 }
 
 // 6. encoded JSON omits id; display formatting
@@ -178,15 +181,85 @@ do {
     check("old license.json decodes (no firstLaunchAt)", s.firstLaunchAt == nil && s.isPro)
 } catch { check("old license.json decodes (no throw)", false) }
 
-// 15. EngineStatus decode
+// 15. Nav Mode key resolution — the engine's built-in bindings
 do {
-    let json = #"{ "loadedAt": 1700000000, "preset": "default", "navEnabled": true }"#
-    let s = try JSONDecoder().decode(EngineStatus.self, from: Data(json.utf8))
-    check("EngineStatus decodes loadedAt", s.loadedAt == 1_700_000_000)
-    check("EngineStatus decodes navEnabled", s.navEnabled)
-} catch { check("EngineStatus decode (no throw)", false) }
+    var c = Config.default
+    c.apps = [AppShortcut(key: "s", mods: [], bundleID: "com.tinyspeck.slackmacgap", names: ["Slack"])]
 
-// 16. persistence round-trip ("restart" = encode then decode)
+    check("nav: j moves the pointer down",
+          NavMode.action(key: "j", mods: [], config: c) == .moveFraction(x: 0, y: NavMode.smallStep))
+    check("nav: shift+j moves further",
+          NavMode.action(key: "j", mods: ["shift"], config: c) == .moveFraction(x: 0, y: NavMode.bigStep))
+    check("nav: d scrolls down by the configured step",
+          NavMode.action(key: "d", mods: [], config: c) == .scroll(dx: 0, dy: -Int32(c.tuning.scrollStep)))
+    check("nav: shift+d scrolls a full page",
+          NavMode.action(key: "d", mods: ["shift"], config: c) == .scroll(dx: 0, dy: -Int32(c.tuning.scrollStep) * 8))
+    check("nav: space clicks", NavMode.action(key: "space", mods: [], config: c) == .click(count: 1))
+    check("nav: shift+space double-clicks", NavMode.action(key: "space", mods: ["shift"], config: c) == .click(count: 2))
+    check("nav: G scrolls to the bottom",
+          NavMode.action(key: "g", mods: ["shift"], config: c) == .scrollToEdge(top: false))
+    check("nav: escape leaves", NavMode.action(key: "escape", mods: [], config: c) == .leave)
+    check("nav: ? opens the cheat sheet",
+          NavMode.action(key: "/", mods: ["shift"], config: c) == .toggleCheatSheet)
+    check("nav: 2 jumps to the second display",
+          NavMode.action(key: "2", mods: [], config: c) == .jumpDisplay(index: 2))
+    check("nav: a launcher key resolves to its app",
+          NavMode.action(key: "s", mods: [], config: c) == .launch(index: 0))
+    check("nav: an unbound key resolves to nothing",
+          NavMode.action(key: "z", mods: [], config: c) == nil)
+    check("nav: movement repeats on hold",
+          NavMode.action(key: "j", mods: [], config: c)?.repeats == true)
+    check("nav: clicks do not repeat on hold",
+          NavMode.action(key: "space", mods: [], config: c)?.repeats == false)
+}
+
+// 15b. A launcher can never shadow a built-in: built-ins resolve first, and
+// Validation refuses to save such a config in the first place.
+do {
+    var c = Config.default
+    c.apps = [AppShortcut(key: "j", mods: [], bundleID: "com.x.y", names: ["X"])]
+    check("nav: built-in j wins over a launcher on j",
+          NavMode.action(key: "j", mods: [], config: c) == .moveFraction(x: 0, y: NavMode.smallStep))
+    check("validation: a launcher on j is reported as a conflict",
+          Validation.conflicts(in: c).contains { $0.scope == "NAV MODE" })
+}
+
+// 15c. The cheat sheet is generated from the live config
+do {
+    var c = Config.default
+    c.apps = [AppShortcut(key: "s", mods: [], bundleID: "com.tinyspeck.slackmacgap", names: ["Slack"])]
+    let sheet = NavMode.cheatSheet(config: c)
+    check("cheat sheet: lists the user's launcher",
+          sheet.contains { $0.items.contains { $0.label == "Slack" } })
+    let bare = NavMode.cheatSheet(config: .default)
+    check("cheat sheet: omits the launcher section when there are none",
+          !bare.contains { $0.title == "Open app" })
+}
+
+// 15d. Key name / keycode mapping is a true round trip
+do {
+    check("keycodes: j round-trips", KeyCodes.name(for: KeyCodes.keyCode(for: "j")!) == "j")
+    check("keycodes: escape round-trips", KeyCodes.name(for: KeyCodes.keyCode(for: "escape")!) == "escape")
+    check("keycodes: rightAlt reduces to alt", KeyCodes.baseModifier("rightAlt") == "alt")
+    check("keycodes: alt is already a base modifier", KeyCodes.baseModifier("alt") == "alt")
+    check("keycodes: right and left option are distinct names",
+          KeyCodes.sidedModifierName[61] == "rightAlt" && KeyCodes.sidedModifierName[58] == "leftAlt")
+    let ctrlEquals = KeyBinding(mods: ["ctrl"], key: "=")
+    check("keycodes: ctrl+= matches its own event",
+          KeyCodes.matches(ctrlEquals, code: KeyCodes.keyCode(for: "=")!, flags: .maskControl))
+    check("keycodes: ctrl+= does not match with an extra modifier",
+          !KeyCodes.matches(ctrlEquals, code: KeyCodes.keyCode(for: "=")!, flags: [.maskControl, .maskShift]))
+}
+
+// 16. config migrates from the 1.x Hammerspoon location
+do {
+    check("config: new path is under Application Support",
+          ConfigStore.path.contains("Application Support/KeyDeck/config.json"))
+    check("config: 1.x path is still known for migration",
+          ConfigStore.legacyPath.hasSuffix(".hammerspoon/keydeck-config.json"))
+}
+
+// 17. persistence round-trip ("restart" = encode then decode)
 do {
     var c = Config.default
     c.apps = [AppShortcut(key: "x", mods: [], bundleID: "com.x.y", names: ["X"], clickTarget: "center", exitNav: true)]
