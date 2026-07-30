@@ -3,3 +3,6 @@
 # Build products
 app/.build/
 app/KeyDeck.app/
+
+# git worktrees (custom build checked out in parallel)
+.worktrees/
