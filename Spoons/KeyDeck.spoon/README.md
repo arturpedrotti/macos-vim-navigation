@@ -27,13 +27,15 @@ API (standard Spoon lifecycle):
 |---|---|
 | `:start()` | Load the config and activate every enabled module. Errors never crash your config — they're captured to a file the KeyDeck app surfaces. |
 | `:stop()` | Tear down everything: exits Nav Mode, deletes all hotkeys, stops all event taps, watchers, timers, and overlays. |
-| `:bindHotkeys({ toggle = { mods, key } })` | Bind the Nav Mode toggle the Spoon-conventional way (`hs.spoons.bindHotkeysToSpec`). |
+| `:bindHotkeys({ toggle = { mods, key } })` | Bind the Nav Mode toggle. Bound via `hs.hotkey.bindSpec` and tracked by the Spoon, so `:stop()` deletes them; calling it again replaces the previous bindings. |
 
 ## Configuration
 
 Behavior is driven by `~/.hammerspoon/keydeck-config.json`, deep-merged over
 `defaults.lua` — any subset of keys is valid, and the engine reloads automatically
-when the file changes. The KeyDeck app writes this file; hand-editing works too.
+when the file changes. You create and edit this file by hand — the 2.0 app no
+longer writes it (its own config lives at
+`~/Library/Application Support/KeyDeck/config.json`).
 See `config/keydeck-config.example.json` and `config/config.schema.json` at the
 repo root for the full contract.
 

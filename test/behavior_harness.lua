@@ -261,12 +261,30 @@ setMouse(centerOf(S[1])); resetRec(); timerQ = {}; CLOCK = 200
 flags({ alt = true }); keydown({ alt = true, cmd = true }, 9, "j"); flags({}); flush()
 check("⌥ tap with Cmd+J held does NOT cycle", approx(mousePos.x, centerOf(S[1]).x), ("x=%.0f"):format(mousePos.x))
 
+-- (b2) Reverse order: a second MODIFIER pressed and released during the ⌥ hold
+-- (⌥ down, ⇧ down, ⇧ up, ⌥ up) is a chord, not a clean tap -> NO cycle.
+setMouse(centerOf(S[1])); resetRec(); timerQ = {}; CLOCK = 250
+flags({ alt = true }); flags({ alt = true, shift = true }); flags({ alt = true }); flags({}); flush()
+check("⌥ tap with a ⇧ chord mid-hold does NOT cycle", approx(mousePos.x, centerOf(S[1]).x), ("x=%.0f"):format(mousePos.x))
+
 -- (c) Option+D scrolls (and counts as 'other key', also no cycle).
 setMouse(centerOf(S[1])); resetRec(); timerQ = {}; CLOCK = 300
 flags({ alt = true }); keydown({ alt = true }, hs.keycodes.map.d, "d")
 check("⌥+D emits a scroll", #rec.scrolls == 1 and rec.scrolls[1][2] == -260, ("n=%d"):format(#rec.scrolls))
 flags({}); flush()
 check("⌥+D does not cycle screens", approx(mousePos.x, centerOf(S[1]).x))
+
+-- (d) The idle guard covers ALL typing: a plain keypress (no modifier held)
+-- immediately followed by a clean ⌥ tap must NOT cycle...
+setMouse(centerOf(S[1])); resetRec(); timerQ = {}; CLOCK = 350
+keydown({}, 8, "c")
+flags({ alt = true }); flags({}); flush()
+check("typing then an immediate ⌥ tap does NOT cycle", approx(mousePos.x, centerOf(S[1]).x), ("x=%.0f"):format(mousePos.x))
+-- ...but once the keyboard has been idle past optionReleaseIdleSeconds (2.0),
+-- the same tap cycles again.
+CLOCK = 353
+flags({ alt = true }); flags({}); flush()
+check("⌥ tap after the idle window cycles", approx(mousePos.x, centerOf(S[2]).x), ("x=%.0f"):format(mousePos.x))
 
 print("Right-⌘ nav activator (clean tap toggles NAV MODE; combo does not):")
 -- Clean tap: right-cmd down (keycode 54, only cmd flag) then up, no other key.
@@ -280,6 +298,11 @@ check("second Right-⌘ tap exits NAV MODE", rec.modalExits == 1, ("exits=%d"):f
 resetRec()
 flags({ cmd = true }, 54); keydown({ cmd = true }, 8, "c"); flags({}, 54)
 check("Right-⌘+C does not toggle", rec.modalEnters == 0 and rec.modalExits == 0,
+  ("enters=%d exits=%d"):format(rec.modalEnters, rec.modalExits))
+-- A second modifier chorded in and released mid-hold must not toggle either.
+resetRec()
+flags({ cmd = true }, 54); flags({ cmd = true, shift = true }, 56); flags({ cmd = true }, 56); flags({}, 54)
+check("Right-⌘ tap with a ⇧ chord mid-hold does not toggle", rec.modalEnters == 0 and rec.modalExits == 0,
   ("enters=%d exits=%d"):format(rec.modalEnters, rec.modalExits))
 check("help overlay '?' is bound", modalBinds[modKey({ "shift" }, "/")] ~= nil)
 
@@ -322,6 +345,16 @@ setMouse(centerOf(S[1])); resetRec(); timerQ = {}; CLOCK = 600
 flags({ alt = true }, 58); flags({}, 58); flush()
 check("⌥ tap toggles NAV MODE", rec.modalEnters == 1, ("enters=%d"):format(rec.modalEnters))
 check("⌥ tap does NOT also cycle displays", approx(mousePos.x, centerOf(S[1]).x), ("x=%.0f"):format(mousePos.x))
+
+print("App shortcut resilience (dead userdata from hs.application.get):")
+-- hs.application.get() can return a zombie object for an app that already quit;
+-- every method call on it raises. The launcher must fall through to launching.
+hs.application.get = function()
+  return setmetatable({}, { __index = function() return function() error("dead userdata handle") end end })
+end
+resetRec(); timerQ = {}
+pressModal({}, "c"); flush()
+check("dead app handle falls back to launching", rec.launches[1] == "com.openai.chat", table.concat(rec.launches, ","))
 
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

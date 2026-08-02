@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  app:
+    name: App (Swift build + assertions + XCTest)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: app/test/run.sh
+        run: bash app/test/run.sh
+
+  spoon:
+    name: Spoon (Lua harness, no Hammerspoon)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install luajit
+        run: sudo apt-get update && sudo apt-get install -y luajit
+      - name: test/run.sh
+        run: bash test/run.sh

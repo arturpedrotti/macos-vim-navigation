@@ -168,6 +168,8 @@ do
     local spoonObj = dofile(SPOON .. "/init.lua")
     spoonObj:init()
     spoonObj:_start()
+    -- bindHotkeys() hotkeys must be tracked and deleted by stop() too.
+    spoonObj:bindHotkeys({ toggle = { { "ctrl" }, "=" } })
     local boundBefore = counts.globalBind
     spoonObj:stop()
     assert(counts.hotkeyDeletes == boundBefore,
@@ -175,6 +177,14 @@ do
     assert(counts.tapStops > 0, "stop() stopped no taps/watchers")
     assert(spoonObj.engine == nil, "stop() must clear self.engine")
     spoonObj:_start()
+    -- The second start() must restore the bindHotkeys() toggle stop() deleted:
+    -- the Spoon re-applies its remembered mapping, so the spoon-level hotkey
+    -- is live (tracked) again and the bind count covers engine binds + toggle.
+    assert(spoonObj._spoonHotkeys and #spoonObj._spoonHotkeys == 1,
+      "second start() did not re-bind the bindHotkeys() toggle hotkey")
+    assert(counts.globalBind == boundBefore * 2,
+      ("second start() bound %d hotkeys, expected %d (engine + restored toggle)")
+        :format(counts.globalBind - boundBefore, boundBefore))
   end)
   if ok then
     print(string.format("PASS [start-stop-start]  hotkeyDeletes=%d tapStops=%d", counts.hotkeyDeletes, counts.tapStops))

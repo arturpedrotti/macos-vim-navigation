@@ -66,15 +66,42 @@ final class LicenseManager: ObservableObject {
         req.httpMethod = "POST"
         req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        req.httpBody = "product_id=\(LicenseConfig.productID)&license_key=\(trimmed)&increment_uses_count=\(incrementUses)"
-            .data(using: .utf8)
+        req.httpBody = Self.formEncode([
+            ("product_id", LicenseConfig.productID),
+            ("license_key", trimmed),
+            ("increment_uses_count", incrementUses ? "true" : "false"),
+        ]).data(using: .utf8)
         do {
-            let (data, _) = try await URLSession.shared.data(for: req)
-            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  json["success"] as? Bool == true else { return .failure(.invalid) }
+            let (data, response) = try await URLSession.shared.data(for: req)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+                // An unparseable body is a transport/server problem, never a
+                // verdict on the key — .invalid would let revalidateIfStale()
+                // deactivate a good license during a Gumroad outage.
+                return .failure(.network)
+            }
+            if json["success"] as? Bool != true {
+                // Only definitive negatives count as invalid: Gumroad answers
+                // 404 for an unknown key, and a 2xx with success:false is an
+                // explicit rejection. Anything else (429, 5xx, …) is the
+                // server having a bad day, not the license.
+                if status == 404 || (200...299).contains(status) {
+                    return .failure(.invalid)
+                }
+                return .failure(.network)
+            }
             let uses = json["uses"] as? Int
             if let uses, uses > LicenseConfig.maxActivations { return .failure(.activationLimit) }
             let purchase = json["purchase"] as? [String: Any]
+            // Gumroad answers success=true even for refunded / charged-back /
+            // lapsed purchases — those flags make the license invalid.
+            if purchase?["refunded"] as? Bool == true
+                || purchase?["chargebacked"] as? Bool == true
+                || Self.isPresent(purchase?["subscription_cancelled_at"])
+                || Self.isPresent(purchase?["subscription_failed_at"])
+                || Self.isPresent(purchase?["subscription_ended_at"]) {
+                return .failure(.invalid)
+            }
             state.licenseKey = trimmed
             state.email = purchase?["email"] as? String
             state.verifiedAt = Date()
@@ -89,11 +116,13 @@ final class LicenseManager: ObservableObject {
 
     /// Re-verify silently if the cached receipt is stale (keeps offline use
     /// working). Never increments the Gumroad uses count — this is a check,
-    /// not a new activation.
+    /// not a new activation. A definitive "invalid" (bad key, refunded,
+    /// charged back) clears the Pro state; a network failure never does.
     func revalidateIfStale() async {
         guard state.isPro, let key = state.licenseKey, let at = state.verifiedAt else { return }
-        if Date().timeIntervalSince(at) > LicenseConfig.reverifyAfterDays * 86_400 {
-            _ = await activate(key: key, incrementUses: false)
+        guard Date().timeIntervalSince(at) > LicenseConfig.reverifyAfterDays * 86_400 else { return }
+        if case .failure(.invalid) = await activate(key: key, incrementUses: false) {
+            deactivate()
         }
     }
 
@@ -103,6 +132,24 @@ final class LicenseManager: ObservableObject {
     }
 
     private func persist() { try? Self.encoder.encode(state).write(to: Self.fileURL, options: .atomic) }
+
+    /// x-www-form-urlencoded body with every value percent-encoded (RFC 3986
+    /// unreserved characters only) — a key containing `&`, `=`, `+`, etc. must
+    /// not be able to smuggle extra form fields into the request.
+    private static func formEncode(_ fields: [(String, String)]) -> String {
+        var unreserved = CharacterSet.alphanumerics
+        unreserved.insert(charactersIn: "-._~")
+        func enc(_ s: String) -> String {
+            s.addingPercentEncoding(withAllowedCharacters: unreserved) ?? s
+        }
+        return fields.map { "\(enc($0.0))=\(enc($0.1))" }.joined(separator: "&")
+    }
+
+    /// True when a JSON field is present with a real (non-null) value.
+    private static func isPresent(_ value: Any?) -> Bool {
+        guard let value else { return false }
+        return !(value is NSNull)
+    }
 
     // MARK: machine binding
 

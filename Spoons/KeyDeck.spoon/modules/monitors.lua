@@ -62,8 +62,13 @@ function M.setup(ctx)
       local f = e:getFlags()
       if f[cycleMod] and not optionHoldActive then
         optionHoldActive = true
-        optionOtherKey = false
+        -- Pressed while another modifier is already down -> chorded, not a tap.
+        optionOtherKey = otherModsHeld(f)
         if pendingReleaseTimer then pendingReleaseTimer:stop(); pendingReleaseTimer = nil end
+      elseif f[cycleMod] and optionHoldActive then
+        -- A second modifier chorded in mid-hold (even if released before the
+        -- cycle modifier) dirties the tap, same as a normal key would.
+        if otherModsHeld(f) then optionOtherKey = true end
       elseif not f[cycleMod] and optionHoldActive then
         optionHoldActive = false
         local idle = timer.secondsSinceEpoch() - lastOptionKeyTime
@@ -86,8 +91,11 @@ function M.setup(ctx)
     ctx.optionFlagsWatcher:start()
 
     ctx.optionKeyWatcher = eventtap.new({ eventtap.event.types.keyDown }, function(e)
+      -- EVERY keyDown refreshes the idle clock (documented behavior: a tap
+      -- within optionReleaseIdleSeconds of any typing must not cycle) — one
+      -- clock read per keypress, cheap enough to run unconditionally.
+      lastOptionKeyTime = timer.secondsSinceEpoch()
       if optionHoldActive or pendingReleaseTimer then
-        lastOptionKeyTime = timer.secondsSinceEpoch()
         local f = e:getFlags()
         if feat.optionScroll and f[cycleMod] and not otherModsHeld(f) then
           local kc = e:getKeyCode()
@@ -147,14 +155,15 @@ function M.setup(ctx)
     local currentWin = window.focusedWindow()
     if not currentWin then hs.alert.show("No window focused"); return end
     local currentScreen = currentWin:screen()
-    local allScreens = hs.screen.allScreens()
+    -- getPhysicalScreens() skips virtual displays and sorts a fresh copy —
+    -- never sort hs.screen.allScreens()'s live table in place.
+    local allScreens = getPhysicalScreens()
     local visible = hs.fnutils.filter(window.orderedWindows(), function(w)
       return not w:isMinimized() and w:isVisible() and w:isStandard()
     end)
     if #visible <= 1 then hs.alert.show("No other visible windows"); return end
 
     if #allScreens > 1 then
-      table.sort(allScreens, function(a, b) return a:frame().x < b:frame().x end)
       local idx = 1
       for i, s in ipairs(allScreens) do if s:id() == currentScreen:id() then idx = i; break end end
       local target

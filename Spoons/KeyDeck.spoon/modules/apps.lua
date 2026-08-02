@@ -58,19 +58,23 @@ function M.setup(ctx)
       end
     end
 
+    -- hs.application.get() can return dead userdata for an app that already
+    -- quit; any method call on it raises. Treat a raising handle exactly like
+    -- "not running" and fall through to the launch path.
     local running = findRunning(entry.names)
+    local focused = false
     if running then
-      running:unhide()
-      local win = running:mainWindow()
-      if win then
+      local ok, hadWindow = pcall(function()
+        running:unhide()
+        local win = running:mainWindow()
+        if not win then return false end
         if win:isMinimized() then win:unminimize() end
         focusAndClick(win, target)
-      else
-        openFresh()
-      end
-    else
-      openFresh()
+        return true
+      end)
+      focused = ok and hadWindow == true
     end
+    if not focused then openFresh() end
 
     if entry.exitNav ~= false then modal:exit() end
   end

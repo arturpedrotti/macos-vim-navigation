@@ -54,8 +54,10 @@ public enum Launcher {
             return u
         }
         for name in shortcut.names {
-            let path = "/Applications/\(name).app"
-            if FileManager.default.fileExists(atPath: path) { return URL(fileURLWithPath: path) }
+            for dir in ["/Applications", NSHomeDirectory() + "/Applications"] {
+                let path = "\(dir)/\(name).app"
+                if FileManager.default.fileExists(atPath: path) { return URL(fileURLWithPath: path) }
+            }
         }
         return nil
     }

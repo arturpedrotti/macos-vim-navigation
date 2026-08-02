@@ -79,8 +79,9 @@ public enum NavMode {
         }
 
         // gg / G — handled here for `G`; bare `g` needs the double-tap state the
-        // engine tracks, so it is resolved there.
-        if k == "g" && shift { return .scrollToEdge(top: false) }
+        // engine tracks, so it is resolved there. Shift must be the only
+        // modifier, like every other shifted binding.
+        if k == "g" && shift && mods.count == 1 { return .scrollToEdge(top: false) }
 
         if bare {
             switch k {

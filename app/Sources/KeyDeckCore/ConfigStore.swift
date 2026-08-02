@@ -48,7 +48,7 @@ public enum ConfigStore {
         return try enc.encode(config)
     }
 
-    /// Write the config to disk (creating ~/.hammerspoon if needed).
+    /// Write the config to disk (creating Application Support/KeyDeck if needed).
     public static func save(_ config: Config) throws {
         let dir = (path as NSString).deletingLastPathComponent
         try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)

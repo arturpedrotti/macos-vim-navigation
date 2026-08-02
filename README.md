@@ -27,14 +27,16 @@ trigger itself needn't cost one either — set it to a clean tap of right ⌥, a
 
 ## Install
 
-Download `KeyDeck.app`, drag it to Applications, open it, click **Turn on
-KeyDeck**, tick it in the Accessibility list. That is the whole setup.
+Download the latest `KeyDeck.app` ZIP from the repo's
+[GitHub Releases page](https://github.com/arturgrochau/macos-vim-navigation/releases/latest),
+drag `KeyDeck.app` to Applications, open it, click **Turn on KeyDeck**, tick it
+in the Accessibility list. That is the whole setup.
 
 Accessibility is the *only* permission KeyDeck asks for — macOS requires it of
 anything that reads the keyboard. There is no helper daemon, no scripting
 runtime, and nothing to install alongside it.
 
-To build from source:
+Or build from source — one command, same app:
 
 ```bash
 cd app && ./bundle.sh    # → app/KeyDeck.app
@@ -59,7 +61,8 @@ there is no apply step, no reload, and no way to be "saved but not running".
 | `app/Sources/KeyDeck/` | The SwiftUI menu-bar app ([details](app/README.md)) |
 | `config/` | Config schema + example config |
 | `Spoons/KeyDeck.spoon/` | **Legacy.** The 1.x [Hammerspoon](https://www.hammerspoon.org) engine, kept for people already running Hammerspoon |
-| `app/test/run.sh` | Offline test suite |
+| `app/test/run.sh` | Offline test suite for the app |
+| `test/run.sh` | Offline test suite for the Spoon (needs `lua`/`luajit` and `python3`; no Hammerspoon required) |
 
 ## Configuration
 
@@ -70,11 +73,21 @@ keys is valid and the rest falls back to defaults. See
 [`config/keydeck-config.example.json`](config/keydeck-config.example.json) and
 [`config/config.schema.json`](config/config.schema.json).
 
+## Known conventions
+
+- The `capsLock` activator kind actually listens for **F18**: it requires an
+  external Caps Lock → F18 remap (e.g. with
+  [Karabiner-Elements](https://karabiner-elements.pqrs.org)).
+- Key bindings are **US-ANSI positional**: on a non-QWERTY layout a binding
+  refers to the physical key position, not the character printed on the key.
+
 ## Upgrading from 1.x
 
 Your launchers and trigger carry over automatically. The Hammerspoon Spoon is no
-longer used by the app; to stop it running as well, remove the two KeyDeck lines
-from `~/.hammerspoon/init.lua`.
+longer used by the app; to stop it running as well, remove the three KeyDeck
+lines the installer added to `~/.hammerspoon/init.lua` (the
+`-- KeyDeck (added by the KeyDeck app)` marker comment and the two loader lines
+below it).
 
 ## Pricing
 

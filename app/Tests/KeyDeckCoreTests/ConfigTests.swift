@@ -59,10 +59,12 @@ final class ConfigTests: XCTestCase {
         XCTAssertFalse(Validation.isReservedNavKey(key: "z", mods: []))
     }
 
-    func testDuplicateGlobalBindingDetected() {
+    func testLauncherOnExitKeyDetected() {
+        // Exit keys and launchers share the NAV MODE namespace, so a launcher
+        // placed on an exit key (default: ⌃C) must be reported as a conflict.
         var c = Config.default
-        c.features.monitors.jumpKeys = ["1", "1"]
-        XCTAssertTrue(Validation.conflicts(in: c).contains { $0.scope == "Global" && $0.signature == "⌥1" })
+        c.apps = [AppShortcut(key: "c", mods: ["ctrl"], bundleID: "a")]
+        XCTAssertTrue(Validation.conflicts(in: c).contains { $0.scope == "NAV MODE" && $0.signature == "⌃C" })
     }
 
     func testEncodedJSONOmitsAppID() throws {

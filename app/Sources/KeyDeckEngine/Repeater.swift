@@ -13,19 +13,25 @@ final class Repeater {
     /// Run `action` now, then again every `interval` after `delay`, until
     /// `stop(keyCode:)`. Starting a key that is already held is a no-op, which
     /// makes it safe to call from every keyDown including stray repeats.
+    ///
+    /// Timers are added to the main run loop in `.common` mode: the default mode
+    /// stalls while a menu or modal event-tracking loop is running, which would
+    /// freeze a hold-to-repeat glide mid-flight.
     func start(keyCode: Int, delay: TimeInterval, interval: TimeInterval, action: @escaping () -> Void) {
         guard timers[keyCode] == nil else { return }
         action()
         var group: [Timer] = []
-        let delayTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
+        let delayTimer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, self.timers[keyCode] != nil else { return }
-                let repeatTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
+                let repeatTimer = Timer(timeInterval: interval, repeats: true) { _ in
                     MainActor.assumeIsolated { action() }
                 }
+                RunLoop.main.add(repeatTimer, forMode: .common)
                 self.timers[keyCode, default: []].append(repeatTimer)
             }
         }
+        RunLoop.main.add(delayTimer, forMode: .common)
         group.append(delayTimer)
         timers[keyCode] = group
     }

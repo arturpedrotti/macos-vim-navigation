@@ -137,6 +137,10 @@ function obj:_start()
   writeStatus(cfg)
   if cfg.debug then hs.alert.show("KeyDeck loaded — preset: " .. (cfg.preset or "default")) end
   self.engine = ctx
+  -- stop() deletes the bindHotkeys() hotkeys; re-apply the remembered mapping
+  -- so a stop() → start() cycle restores them. bindHotkeys() replaces any
+  -- previous bindings, so this is safe to call unconditionally.
+  if self._hotkeyMapping then self:bindHotkeys(self._hotkeyMapping) end
   return ctx
 end
 
@@ -161,6 +165,13 @@ end
 --- Tears down everything start() created: exits NAV MODE, deletes every global
 --- hotkey, and stops all event taps, watchers, timers, and overlays.
 function obj:stop()
+  -- Hotkeys bound via bindHotkeys() live on the Spoon object, not the engine,
+  -- so delete them even if start() was never called.
+  for _, hk in ipairs(self._spoonHotkeys or {}) do
+    pcall(function() hk:delete() end)
+  end
+  self._spoonHotkeys = nil
+
   local ctx = self.engine
   if not ctx then return self end
 
@@ -178,6 +189,9 @@ function obj:stop()
       ctx[name] = nil
     end
   end
+
+  -- The hammerspoon://reload handler _start() registered.
+  pcall(function() hs.urlevent.bind("reload", nil) end)
 
   -- Hold-to-repeat timers.
   for key, t in pairs(ctx.held or {}) do
@@ -212,13 +226,31 @@ end
 --- Example:
 ---   spoon.KeyDeck:bindHotkeys({ toggle = { { "ctrl" }, "=" } })
 function obj:bindHotkeys(mapping)
+  -- Remember the mapping so _start() can re-apply it after a stop() deleted
+  -- the hotkey objects (stop() intentionally leaves this field alone).
+  self._hotkeyMapping = mapping
   local spec = {
     toggle = function()
       if self.engine and self.engine.toggleNav then self.engine.toggleNav() end
     end,
   }
-  if hs.spoons and hs.spoons.bindHotkeysToSpec then
-    hs.spoons.bindHotkeysToSpec(spec, mapping)
+  -- Bound directly (not via hs.spoons.bindHotkeysToSpec, which keeps the hotkey
+  -- objects to itself) so stop() can track and delete them. Rebinding replaces
+  -- the previous set, matching bindHotkeysToSpec's behavior.
+  for _, hk in ipairs(self._spoonHotkeys or {}) do
+    pcall(function() hk:delete() end)
+  end
+  self._spoonHotkeys = {}
+  for name, key in pairs(mapping or {}) do
+    if spec[name] and type(key) == "table" then
+      local hk
+      if hs.hotkey.bindSpec then
+        hk = hs.hotkey.bindSpec(key, spec[name])
+      else
+        hk = hs.hotkey.bind(key[1] or {}, key[2], spec[name])
+      end
+      if hk then table.insert(self._spoonHotkeys, hk) end
+    end
   end
   return self
 end

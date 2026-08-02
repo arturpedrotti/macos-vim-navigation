@@ -10,7 +10,7 @@ swift build
 
 echo "== 2. core + engine logic assertions (no XCTest needed) =="
 SDK="$(xcrun --sdk macosx --show-sdk-path)"
-TGT="arm64-apple-macosx13.0"
+TGT="$(uname -m)-apple-macosx13.0"   # arm64 or x86_64
 OUT="$(mktemp -d)/kd_checks"
 # The checks compile Core + Engine + the runner as ONE module, so the
 # cross-module imports have to be stripped from the copies we feed swiftc.

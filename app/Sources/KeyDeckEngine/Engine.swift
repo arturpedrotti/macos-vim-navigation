@@ -44,8 +44,7 @@ public final class Engine: ObservableObject {
     /// the display cycle. A "clean tap" means the modifier went down and came
     /// back up with no other key pressed in between — that is what lets ⌥ still
     /// work in ⌥⌘J while a bare ⌥ tap does something of its own.
-    private var modifierDown: [String: Bool] = [:]
-    private var modifierClean: [String: Bool] = [:]
+    private var modifierTaps = ModifierTapTracker()
     private var lastKeyPressAt: Date = .distantPast
     private var lastModifierTapAt: Date = .distantPast
 
@@ -140,7 +139,7 @@ public final class Engine: ObservableObject {
     /// Any real keypress cancels every pending "clean modifier tap".
     private func markKeyActivity() {
         lastKeyPressAt = Date()
-        for key in modifierClean.keys { modifierClean[key] = false }
+        modifierTaps.keyPressed()
     }
 
     private func handleKeyDown(_ event: CGEvent) -> Bool {
@@ -316,15 +315,8 @@ public final class Engine: ObservableObject {
         let isDown = flags.contains(flag)
         let othersHeld = !flags.subtracting(flag).isEmpty
 
-        if isDown {
-            modifierDown[name] = true
-            // Pressed together with another modifier — not a clean tap.
-            modifierClean[name] = !othersHeld
-        } else if modifierDown[name] == true {
-            modifierDown[name] = false
-            let wasClean = modifierClean[name] == true
-            modifierClean[name] = false
-            if wasClean { modifierTapped(name) }
+        if let tapped = modifierTaps.flagsChanged(name: name, isDown: isDown, othersHeld: othersHeld) {
+            modifierTapped(tapped)
         }
     }
 
@@ -367,5 +359,42 @@ public final class Engine: ObservableObject {
         // An either-side setting matches both sided keys.
         return KeyCodes.baseModifier(configured) == configured
             && KeyCodes.baseModifier(tapped) == configured
+    }
+}
+
+/// The "clean tap" state machine for sided modifier keys. Pure state, factored
+/// out of the engine so the offline checks can drive it without CGEvents.
+///
+/// A tap is clean only if the modifier went down and came back up with nothing
+/// else pressed in between — no normal key AND no other modifier. Chording is
+/// symmetric: pressing a second modifier dirties every modifier already held,
+/// not just the newcomer, so e.g. rightAlt↓ shift↓ shift↑ rightAlt↑ fires nothing.
+struct ModifierTapTracker {
+    private var down: [String: Bool] = [:]
+    private var clean: [String: Bool] = [:]
+
+    /// Any real keypress cancels every pending clean tap.
+    mutating func keyPressed() {
+        for key in clean.keys { clean[key] = false }
+    }
+
+    /// Feed one modifier transition. Returns the modifier's name when its
+    /// release completed a clean tap, nil otherwise.
+    mutating func flagsChanged(name: String, isDown: Bool, othersHeld: Bool) -> String? {
+        if isDown {
+            // Pressed together with another modifier — a chord: neither the new
+            // key nor anything already held can be a clean tap anymore.
+            if othersHeld {
+                for key in down.keys where down[key] == true { clean[key] = false }
+            }
+            down[name] = true
+            clean[name] = !othersHeld
+        } else if down[name] == true {
+            down[name] = false
+            let wasClean = clean[name] == true
+            clean[name] = false
+            if wasClean { return name }
+        }
+        return nil
     }
 }

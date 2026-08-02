@@ -66,6 +66,14 @@ do {
     check("isReservedNavKey: bare z is free", !Validation.isReservedNavKey(key: "z", mods: []))
 }
 do {
+    // Exit keys and launchers share the NAV MODE namespace, so a launcher
+    // placed on an exit key (default: ⌃C) is a conflict.
+    var c = Config.default
+    c.apps = [AppShortcut(key: "c", mods: ["ctrl"], bundleID: "a")]
+    check("launcher on an exit key (⌃C) detected",
+          Validation.conflicts(in: c).contains { $0.scope == "NAV MODE" && $0.signature == "⌃C" })
+}
+do {
     // The Nav Mode trigger is the only global shortcut KeyDeck claims — putting
     // a launcher on it is not a conflict, because launchers live in the modal
     // namespace and only fire once the mode is already on.
@@ -198,6 +206,8 @@ do {
     check("nav: shift+space double-clicks", NavMode.action(key: "space", mods: ["shift"], config: c) == .click(count: 2))
     check("nav: G scrolls to the bottom",
           NavMode.action(key: "g", mods: ["shift"], config: c) == .scrollToEdge(top: false))
+    check("nav: ctrl+shift+g is not scroll-to-bottom",
+          NavMode.action(key: "g", mods: ["shift", "ctrl"], config: c) == nil)
     check("nav: escape leaves", NavMode.action(key: "escape", mods: [], config: c) == .leave)
     check("nav: ? opens the cheat sheet",
           NavMode.action(key: "/", mods: ["shift"], config: c) == .toggleCheatSheet)
@@ -249,6 +259,43 @@ do {
           KeyCodes.matches(ctrlEquals, code: KeyCodes.keyCode(for: "=")!, flags: .maskControl))
     check("keycodes: ctrl+= does not match with an extra modifier",
           !KeyCodes.matches(ctrlEquals, code: KeyCodes.keyCode(for: "=")!, flags: [.maskControl, .maskShift]))
+}
+
+// 15e. Modifier clean-tap tracking (the tap activator / display-cycle trigger)
+do {
+    var t = ModifierTapTracker()
+    check("tap: down + up alone is a clean tap",
+          t.flagsChanged(name: "rightAlt", isDown: true, othersHeld: false) == nil
+          && t.flagsChanged(name: "rightAlt", isDown: false, othersHeld: false) == "rightAlt")
+
+    t = ModifierTapTracker()
+    _ = t.flagsChanged(name: "rightAlt", isDown: true, othersHeld: false)
+    t.keyPressed()
+    check("tap: a key press mid-hold cancels the tap",
+          t.flagsChanged(name: "rightAlt", isDown: false, othersHeld: false) == nil)
+
+    // Chording is symmetric: modifier A down → modifier B down+up → A up must
+    // NOT count as a clean tap of A (B was pressed during A's hold).
+    t = ModifierTapTracker()
+    _ = t.flagsChanged(name: "rightAlt", isDown: true, othersHeld: false)
+    check("tap: chorded second modifier fires nothing on its release",
+          t.flagsChanged(name: "shift", isDown: true, othersHeld: true) == nil
+          && t.flagsChanged(name: "shift", isDown: false, othersHeld: true) == nil)
+    check("tap: first modifier is dirtied by the chord — no tap on its release",
+          t.flagsChanged(name: "rightAlt", isDown: false, othersHeld: false) == nil)
+
+    // A modifier pressed while another is already down is dirty from the start.
+    t = ModifierTapTracker()
+    _ = t.flagsChanged(name: "shift", isDown: true, othersHeld: false)
+    _ = t.flagsChanged(name: "rightAlt", isDown: true, othersHeld: true)
+    _ = t.flagsChanged(name: "shift", isDown: false, othersHeld: true)
+    check("tap: modifier pressed into a held chord is not a clean tap",
+          t.flagsChanged(name: "rightAlt", isDown: false, othersHeld: false) == nil)
+
+    // The tracker recovers: a later solo tap still fires.
+    check("tap: a fresh solo tap after a chord still fires",
+          t.flagsChanged(name: "rightAlt", isDown: true, othersHeld: false) == nil
+          && t.flagsChanged(name: "rightAlt", isDown: false, othersHeld: false) == "rightAlt")
 }
 
 // 16. config migrates from the 1.x Hammerspoon location

@@ -113,10 +113,15 @@ final class AppModel: ObservableObject {
 
     /// Write the config to disk. A conflicted config is never written — the
     /// inline warnings stand until it's resolved — but the engine already holds
-    /// it in memory, so the user can still see what their edit does.
+    /// it in memory, so the user can still see what their edit does. The refusal
+    /// is surfaced via `saveError`: silently skipping the write would lose the
+    /// edits on quit with no warning at all.
     func persistNow() {
         persistTask?.cancel()
-        guard conflicts.isEmpty else { return }
+        guard conflicts.isEmpty else {
+            saveError = "Settings not saved — resolve the duplicate key bindings first."
+            return
+        }
         do {
             try ConfigStore.save(config.curated())
             saveError = nil
